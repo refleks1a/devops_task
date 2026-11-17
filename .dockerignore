@@ -1,0 +1,5 @@
+.git
+.env
+*.log
+ansible
+__pycache__
