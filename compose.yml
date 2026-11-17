@@ -1,9 +1,9 @@
 services:
   portal:
     build: .
-    image: student-portal:1.0
+    image: ${IMAGE_NAME:-student-portal:1.0}
     ports:
-      - "8080:5000"
+      - "${PORTAL_PORT:-8080}:5000"
     environment:
       REDIS_HOST: redis
     depends_on:
