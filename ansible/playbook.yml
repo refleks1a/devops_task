@@ -1,0 +1,72 @@
+---
+- name: Deploy University Student Portal
+  hosts: app_servers
+  become: true
+
+  tasks:
+    - name: Install Docker engine and Compose plugin
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - curl
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure Docker service is enabled and running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create portal directory
+      ansible.builtin.file:
+        path: "{{ portal_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy Dockerfile and compose.yml
+      ansible.builtin.copy:
+        src: "{{ project_root }}/{{ item }}"
+        dest: "{{ portal_dir }}/{{ item }}"
+        mode: "0644"
+      loop:
+        - Dockerfile
+        - compose.yml
+        - .dockerignore
+      register: files_infra
+
+    - name: Copy application code
+      ansible.builtin.copy:
+        src: "{{ project_root }}/app/"
+        dest: "{{ portal_dir }}/app/"
+        mode: "0644"
+      register: files_app
+
+    - name: Render .env with image name and port
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ portal_dir }}/.env"
+        mode: "0644"
+      register: files_env
+
+    - name: Start portal and Redis with Compose
+      community.docker.docker_compose_v2:
+        project_src: "{{ portal_dir }}"
+        state: present
+        build: "{{ 'always' if (files_infra.changed or files_app.changed or files_env.changed) else 'policy' }}"
+
+    - name: Check portal /health endpoint
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ portal_port }}/health"
+        return_content: true
+      register: health
+      retries: "{{ health_retries }}"
+      delay: "{{ health_delay }}"
+      until: health.status == 200
+      changed_when: false
+
+    - name: Show health result
+      ansible.builtin.debug:
+        msg: "Portal at http://{{ ansible_host }}:{{ portal_port }}/ is {{ health.json.status }}"

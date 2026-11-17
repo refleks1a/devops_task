@@ -1,0 +1,7 @@
+# Non-secret deployment settings
+portal_port: 8080
+portal_image: "student-portal:1.0"
+portal_dir: /opt/student-portal
+project_root: "{{ playbook_dir }}/.."
+health_retries: 15
+health_delay: 4
